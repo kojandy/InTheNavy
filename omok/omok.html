@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Omok</title>
+    <style>
+        .viewpanel canvas {
+            position: absolute;
+        }
+    </style>
+    <script>
+        const nx = 30;
+        const ny = 30;
+
+        const state = {
+            init() {
+                this.board = [];
+                for (let i = 0; i < nx; ++i) {
+                    this.board[i] = [];
+                }
+            },
+            put(color, x, y) {
+                if (this.board[x][y] == undefined) {
+                    this.board[x][y] = color;
+                    return true;
+                } else {
+                    return false;
+                }
+            },
+        };
+    </script>
+
+    <script src="view.js"></script>
+
+    <script>
+    window.onload = () => {
+        state.init();
+        let turn = 'white';
+        const view = new View(30, 30);
+        view.onclick = (x, y) => {
+            if (state.put(turn, x, y)) {
+                view.put(turn, x, y);
+                turn = turn == 'white' ? 'black' : 'white';
+            }
+        };
+        view.onmousemove = (x, y) => {
+            view.ghost(turn, x, y);
+        };
+        document.body.appendChild(view.div);
+    };
+    </script>
+</head>
+<body>
+</body>
+</html>

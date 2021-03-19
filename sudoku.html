@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8" />
+        <title>Sudoku</title>
+        <style type="text/css">
+            table {
+                border-collapse: collapse;
+                text-align: center;
+                cursor: default;
+            }
+
+            table#highlight_control {
+                border-collapse: separate;
+            }
+
+            td {
+                width: 75px;
+                height: 75px;
+                border-width: thin;
+                border-style: solid;
+                border-color: black;
+                font-size: xx-large;
+            }
+
+            table.candidate td {
+                color: #bbb;
+                width: 25px;
+                height: 25px;
+                border-style: none;
+                font-size: medium;
+            }
+
+            table#highlight_control td {
+                width: 50px;
+                height: 50px;
+            }
+
+            .highlight {
+                background-color: lightblue;
+            }
+
+            .selected {
+                background-color: lightyellow;
+            }
+
+            .solved {
+                color: blue;
+            }
+
+            .r1 {
+                border-top-width: medium;
+            }
+
+            .r3, .r6, .r9 {
+                border-bottom-width: medium;
+            }
+
+            .c1 {
+                border-left-width: medium;
+            }
+
+            .c3, .c6, .c9 {
+                border-right-width: medium;
+            }
+        </style>
+        <script type="text/javascript">
+            class Cell {
+                constructor(node) {
+                    this._node = node;
+                    this.candidate = {};
+                    this._candidateTableNode = document.createElement("table");
+                    let tbody = document.createElement("tbody");
+                    this._candidateTableNode.classList.add("candidate");
+                    this._candidateTableNode.appendChild(tbody);
+                    for (let i = 0; i < 3; ++i) {
+                        let tr = document.createElement("tr");
+                        tbody.appendChild(tr);
+                        for (let j = 0; j < 3; ++j) {
+                            let td = document.createElement("td");
+                            tr.appendChild(td);
+
+                            let num = 3 * i + j + 1;
+                            td.classList.add(num);
+                            td.textContent = num;
+                            Object.defineProperty(this.candidate, num, (() => {
+                                let value = true;
+                                return {
+                                    get: () => value,
+                                    set: (v) => {
+                                        value = v;
+                                        td.style.visibility = value ? "visible" : "hidden";
+                                    },
+                                };
+                            })());
+                        }
+                    }
+
+                    this.given = false;
+                    this.value = null;
+                    this._selected = false;
+                    this._node.appendChild(this._candidateTableNode);
+                }
+
+                highlight() {
+                    this._node.classList.add("highlight");
+                }
+
+                unhighlight() {
+                    this._node.classList.remove("highlight");
+                }
+
+                get selected() {
+                    return this._selected;
+                }
+
+                set selected(val) {
+                    this._selected = val;
+                    if (this._selected) this._node.classList.add("selected");
+                    else this._node.classList.remove("selected");
+                }
+
+                get value() {
+                    return this._value;
+                }
+
+                set value(val) {
+                    if (val !== null) {
+                        this._value = parseInt(val);
+
+                        this._node.textContent = this._value;
+                        if (!this.given) this._node.classList.add("solved");
+                    } else {
+                        this._value = null;
+
+                        this._node.innerHTML = "";
+                        this._node.appendChild(this._candidateTableNode);
+                        this._node.classList.remove("solved");
+                    }
+                }
+            }
+
+            class Sudoku {
+                constructor(node, givens) {
+                    this._node = node;
+                    let tbody = document.createElement("tbody");
+                    this._node.innerHTML = "";
+                    this._node.appendChild(tbody);
+
+                    this.cells = [,];
+                    for (let form of ["b", "r", "c"]) {
+                        this.cells[form] = [, [], [], [], [], [], [], [], [], []];
+                    }
+                    this.cells.selected = [];
+                    this._highlight = [, false, false, false, false, false, false, false, false, false];
+
+                    for (let r = 1; r <= 9; ++r) {
+                        let line = [,];
+                        let tr = document.createElement("tr");
+
+                        for (let c = 1; c <= 9; ++c) {
+                            let td = document.createElement("td");
+                            td.id = "r" + r + "c" + c;
+                            td.classList.add("r" + r);
+                            td.classList.add("c" + c);
+
+                            let cell = new Cell(td);
+                            let box = Sudoku.box(r, c);
+                            td.onclick = (e) => {
+                                if (e.ctrlKey) {
+                                    if (cell.selected) {
+                                        this.cells.selected = this.cells.selected.filter((v) => {
+                                            if (cell !== v) return true;
+                                            else {
+                                                cell.selected = false;
+                                                return false;
+                                            }
+                                        });
+                                    } else {
+                                        cell.selected = true;
+                                        this.cells.selected.push(cell);
+                                    }
+                                } else {
+                                    if (this.cells.selected.length === 1) {
+                                        if (this.cells.selected[0] === cell) {
+                                            cell.selected = false;
+                                            this.cells.selected = [];
+                                        } else {
+                                            this.cells.selected[0].selected = false;
+                                            cell.selected = true;
+                                            this.cells.selected = [cell];
+                                        }
+                                    } else {
+                                        for (let cell of this.cells.selected) {
+                                            cell.selected = false;
+                                        }
+                                        cell.selected = true;
+                                        this.cells.selected = [cell];
+                                    }
+                                }
+                                e.stopPropagation();
+                            };
+
+                            line.push(cell);
+                            this.cells.b[box].push(cell);
+                            this.cells.r[r].push(cell);
+                            this.cells.c[c].push(cell);
+
+                            tr.appendChild(td);
+                        }
+
+                        this.cells.push(line);
+                        tbody.appendChild(tr);
+                        document.onclick = () => {
+                            for (let cell of this.cells.selected) {
+                                cell.selected = false;
+                            }
+                            this.cells.selected = [];
+                        };
+                    }
+
+                    document.onkeydown = (e) => {
+                        let match = /(Digit|Numpad)([0-9])/.exec(e.code);
+                        if (match !== null) {
+                            let num = parseInt(match[2]);
+                            for (let cell of this.cells.selected) {
+                                if (!cell.given) {
+                                    if (e.ctrlKey) {
+                                        cell.candidate[num] = false;
+                                    } else {
+                                        cell.value = num;
+                                    }
+                                }
+                            }
+                            this.updateCandidate();
+                            e.preventDefault();
+                        } else if (e.code === "Backspace" || e.code === "Delete") {
+                            for (let cell of this.cells.selected) {
+                                if (!cell.given) cell.value = null;
+                            }
+                        }
+                    };
+
+                    if (givens !== undefined) {
+                        givens.forEach((box_value, box_idx) => {
+                            this.cells.b[box_idx + 1].forEach((cell, cell_idx) => {
+                                if (box_value[cell_idx] !== "-") {
+                                    cell.given = true;
+                                    cell.value = box_value[cell_idx];
+                                }
+                            });
+                        });
+                        this.updateCandidate();
+                    }
+                }
+
+                get highlight() {
+                    let ans = [];
+                    this._highlight.forEach((v, i) => {
+                        if (v) ans.push(i);
+                    });
+                    return ans;
+                }
+
+                set highlight(v) {
+                    this._highlight = [, false, false, false, false, false, false, false, false, false];
+                    for (let i of v) {
+                        this._highlight[i] = true;
+                    }
+                    this.updateHighlight();
+                }
+
+                static box(r, c) {
+                    let intDiv = (q, d) => (q - (q % d)) / d;
+                    return 3 * intDiv(r - 1, 3) + intDiv(c - 1, 3) + 1;
+                }
+
+                updateHighlight() {
+                    for (let cell of this.cells.flat()) {
+                        if (cell.value === null
+                            && this.highlight.length !== 0
+                            && this.highlight.every(num => cell.candidate[num])) {
+                            cell.highlight();
+                        } else cell.unhighlight();
+                    }
+                }
+
+                updateCandidate() {
+                    for (let r = 1; r <= 9; ++r) {
+                        for (let c = 1; c <= 9; ++c) {
+                            let value = this.cells[r][c].value;
+                            if (value !== null) {
+                                for (let cell of [
+                                    this.cells.r[r],
+                                    this.cells.c[c],
+                                    this.cells.b[Sudoku.box(r, c)]
+                                ].flat()) {
+                                    cell.candidate[value] = false;
+                                }
+                            }
+                        }
+                    }
+                    this.updateHighlight();
+                }
+            }
+
+            class HighlightControl {
+                constructor(node, sudoku) {
+                    this._node = node;
+                    this._highlight = {};
+                    this.sudoku = sudoku;
+                    let tbody = document.createElement("tbody");
+                    let tr = document.createElement("tr");
+                    for (let i = 1; i <= 9; ++i) {
+                        let td = document.createElement("td");
+                        td.textContent = i;
+                        Object.defineProperty(this._highlight, i, (() => {
+                            let highlight = false;
+                            return {
+                                get: () => highlight,
+                                set: (v) => {
+                                    highlight = v;
+                                    if (highlight) {
+                                        td.classList.add("highlight");
+                                        sudoku.highlight += i;
+                                    } else {
+                                        td.classList.remove("highlight");
+                                        sudoku.highlight = sudoku.highlight.filter(e => e !== i);
+                                    }
+                                },
+                            };
+                        })());
+                        td.onclick = (e) => {
+                            if (e.ctrlKey) {
+                                if (this._highlight[i]) {
+                                    this._highlight[i] = false;
+                                } else {
+                                    this._highlight[i] = true;
+                                }
+                            } else {
+                                let cnt = 0;
+                                let hied = -1;
+                                for (let i = 1; i <= 9; ++i) {
+                                    if (this._highlight[i]) {
+                                        ++cnt;
+                                        hied = i;
+                                    }
+                                }
+                                if (cnt === 1) {
+                                    if (this._highlight[i]) this._highlight[i] = false;
+                                    else {
+                                        this._highlight[hied] = false;
+                                        this._highlight[i] = true;
+                                    }
+                                } else {
+                                    for (let i = 1; i <= 9; ++i) this._highlight[i] = false;
+                                    this._highlight[i] = true;
+                                }
+                            }
+                        };
+                        tr.appendChild(td);
+                    }
+                    tbody.appendChild(tr);
+                    this._node.appendChild(tbody);
+                }
+            }
+
+            let sudoku;
+
+            window.onload = () => {
+                sudoku = new Sudoku(document.getElementById("sudoku"), [
+                    "-269-183-",
+                    "-9----4--",
+                    "3---2---1",
+                    "--81-----",
+                    "736584921",
+                    "-----27--",
+                    "7---8---9",
+                    "--3----7-",
+                    "269517843",
+                ]);
+                control = new HighlightControl(document.getElementById("highlight_control"), sudoku);
+            };
+        </script>
+    </head>
+    <body>
+        <table id="highlight_control"></table>
+        <table id="sudoku"></table>
+    </body>
+</html>
